@@ -1,0 +1,539 @@
+package com.scg.scgcustomerlogistics;
+
+import android.Manifest;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.location.Location;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Looper;
+import android.view.MenuItem;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.ActivityCompat;
+
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
+import com.google.android.gms.location.LocationServices;
+import com.google.firebase.crashlytics.FirebaseCrashlytics;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+
+import okhttp3.ResponseBody;
+
+public class ViewTripActivity extends AppCompatActivity implements OnSuccessListener {
+    private ActionBar actionBar;
+    private Toolbar toolbar;
+    private Button endTripButton;
+    private Boolean isTripRunning = false;
+    private EditText startLocationEditText;
+    private EditText destinationLocationEditText;
+    private EditText descriptionEditText;
+    private EditText stopoverEditText;
+    private EditText amountEditText;
+    private EditText statusEditText;
+    private String startLocation;
+    private String destinationLocation;
+    private String description;
+    private String amount;
+    private String endpoint;
+    private String tripId;
+    private SharedPreferences mPrefs;
+
+    private TextView locationDetectTextview;
+    private FusedLocationProviderClient mFusedLocationClient;
+    private Location mLastLocation;
+    private LocationRequest locationRequest;
+    private LocationCallback locationCallback;
+    private Boolean isTaskRunning = false;
+    private static final int REQUEST_LOCATION_PERMISSION = 1;
+    private Button addStopoverButton;
+//    private Mylocationdatabasehelper dbHelper;
+    private String mTripId;
+    private String endLocationName;
+    private Button mapsTripButton;
+    private Button contactDriverButton;
+    private LinearLayout driverLayout;
+    private EditText driverNameEditText;
+    private EditText driverPhoneEditText;
+
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+//        EdgeToEdge.enable(this);
+        setContentView(R.layout.activity_view_trip);
+
+        toolbar = (Toolbar) findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        actionBar = getSupportActionBar();
+        actionBar.setDisplayHomeAsUpEnabled(true);
+        actionBar.setHomeButtonEnabled(true);
+        actionBar.setTitle("View Trip");
+
+//        dbHelper = new Mylocationdatabasehelper(getApplicationContext());
+//        dbHelper.createTable();
+
+
+
+//        endTripButton = (Button) findViewById(R.id.endTripButton);
+        startLocationEditText = (EditText) findViewById(R.id.startLocationEditText);
+        destinationLocationEditText = (EditText) findViewById(R.id.destinationLocationName);
+        descriptionEditText = (EditText) findViewById(R.id.descriptionEditText);
+        amountEditText = (EditText) findViewById(R.id.amountEditText);
+        stopoverEditText = (EditText) findViewById(R.id.stopoverEditText);
+        statusEditText = (EditText) findViewById(R.id.statusEditText);
+        mapsTripButton = (Button) findViewById(R.id.mapsTripButton);
+        contactDriverButton = (Button) findViewById(R.id.contactDriverButton);
+        driverLayout = (LinearLayout) findViewById(R.id.driverDetails);
+        driverNameEditText = (EditText) findViewById(R.id.driverNameEditText);
+        driverPhoneEditText = (EditText) findViewById(R.id.driverPhoneEditText);
+//        locationDetectTextview = (TextView) findViewById(R.id.locationDetectTextview);
+//        addStopoverButton = (Button) findViewById(R.id.addStopoverButton);
+
+        Intent intent = getIntent();
+        tripId = intent.getStringExtra("tripId");
+        endpoint = "trip/"+tripId;
+
+
+        NetworkUtils.
+                fetchData("GET",endpoint,
+                        null, ViewTripActivity.this,
+                        ViewTripActivity.this);
+
+        //START OF LATEST LOCATION CALL UPDATE
+
+        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+        locationRequest = LocationRequest.create();
+        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+        locationRequest.setInterval(10000); // 10 seconds
+        locationRequest.setFastestInterval(5000); // 5 seconds'
+
+        detectLocation();
+
+        requestLocationUpdates();
+        //END OF LATEST LOCATION CALL UPDATE
+
+//        addStopoverButton.setOnClickListener(
+//                new View.OnClickListener() {
+//                     @Override
+//                     public void onClick(View view) {
+//
+//                         Intent intent = new Intent(ViewTripActivity.this,
+//                                 AddStopoverActivity.class);
+//                         intent.putExtra("tripId",tripId);
+//                         System.out.println("tripId: "+tripId);
+//                         startActivity(intent);
+//
+//
+//                     }
+//                });
+
+
+
+//        endTripButton.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View view) {
+//
+//                if (!isTaskRunning) {
+//                    isTaskRunning = true;
+//                    if (mLastLocation != null) {
+//                        String locationText = mLastLocation.getLatitude() + " - " + mLastLocation.getLongitude() + "";
+//                        //       Toast.makeText(getBaseContext(),locationText,Toast.LENGTH_SHORT).show();
+//                        String lat = mLastLocation.getLatitude() + "";
+//                        String lon = mLastLocation.getLongitude() + "";
+//                        long unixTime = System.currentTimeMillis() / 1000L;
+//
+//                        endpoint = "endtrip/"+tripId;
+//
+//                        JSONObject requestBody = new JSONObject();
+//                        try {
+//
+//                            requestBody.put("end_lat", lat);
+//                            requestBody.put("end_long",lon);
+//
+//
+//
+//                        } catch (JSONException e) {
+//                            e.printStackTrace();
+//                        }
+//
+//                        NetworkUtils.
+//                                fetchData("PUT",endpoint,
+//                                        requestBody, ViewTripActivity.this,
+//                                        ViewTripActivity.this);
+//
+//                    } else {
+////                        Toasts.toastIconError(ClockinActivity.this,"Detecting Location ...");
+//                        Toast.makeText(ViewTripActivity.this,
+//                                "Detecting Location ...",Toast.LENGTH_SHORT).show();
+//                        isTaskRunning = false;
+//                    }
+//                }
+//
+//
+//
+//            }
+//        });
+
+//        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
+//            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+//            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
+//            return insets;
+//        });
+
+    }
+
+    @Override
+    public void onSuccess(ResponseBody responseBody) {
+        String responseBodyString = null;
+        try {
+            String result = responseBody.string();
+            System.out.println("Result: "+result);
+
+            if (result != null && result.contains("trip") &&
+                    endpoint.equals("trip/"+tripId)){
+
+                JSONObject jsonObject = new JSONObject(result);
+
+                if (jsonObject.has("location") &&
+                        jsonObject.get("location") instanceof JSONObject
+                ) {
+
+                    JSONObject location = jsonObject.getJSONObject("location");
+                    mapsTripButton.setVisibility(View.VISIBLE);
+
+                    mapsTripButton.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+
+
+
+                            String strUri = null;
+                            try {
+                                String createdAt = location.getString("created_at");
+                                ZonedDateTime dateTime = Instant.parse(createdAt).atZone(ZoneId.of("Africa/Nairobi"));
+                                String formatted = dateTime.format(DateTimeFormatter.ofPattern("HH:mm dd-MMM-yyyy"));
+
+
+                                strUri = "http://maps.google.com/maps?q=loc:" +
+                                        location.getString("lat") + "," + location.getString("long") + " (Location "+formatted+")";
+                            }
+                            catch (JSONException e) {
+                                throw new RuntimeException(e);
+                            }
+                            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(strUri));
+
+// Check if there's an app that can handle the intent
+                            if (intent.resolveActivity(getPackageManager()) != null) {
+                                try {
+                                    startActivity(intent);
+                                } catch (ActivityNotFoundException e) {
+                                    // Handle the case where no app can handle the intent
+//                                        Toasts.toastIconError(IndividualOutletActivity.this,"No application available to open maps");
+                                    Toast.makeText(ViewTripActivity.this,"No application available to open maps",Toast.LENGTH_SHORT).show();
+                                    FirebaseCrashlytics.getInstance().recordException(e);
+
+                                }
+                            } else {
+                                // Handle the case where no app can handle the intent
+//                                    Toasts.toastIconError(IndividualOutletActivity.this,"No application available to open maps");
+                                Toast.makeText(ViewTripActivity.this,"No application available to open maps",Toast.LENGTH_SHORT).show();
+                                FirebaseCrashlytics.getInstance().recordException(new Exception("IndividualOutletActivity: Attempt to open google maps failed: " +
+                                        "ThisLine: intent.resolveActivity(getPackageManager()) != null"));
+
+                            }
+
+                        }
+                    });
+                }else{
+                    mapsTripButton.setVisibility(View.GONE);
+                    Toast.makeText(ViewTripActivity.this, "No location found", Toast.LENGTH_SHORT).show();
+                }
+
+                if (jsonObject.has("trip") &&
+                        jsonObject.get("trip") instanceof JSONObject
+                ) {
+
+                    JSONObject trip = jsonObject.getJSONObject("trip");
+
+                    if (trip.has("user") &&
+                            trip.get("user") instanceof JSONObject
+                    ) {
+                        contactDriverButton.setVisibility(View.VISIBLE);
+                        driverLayout.setVisibility(View.VISIBLE);
+                        driverNameEditText.setText(trip.getJSONObject("user").getString("name"));
+                        driverPhoneEditText.setText(trip.getJSONObject("user").getString("phone"));
+                    }else{
+                        contactDriverButton.setVisibility(View.GONE);
+                        driverLayout.setVisibility(View.GONE);
+                    }
+
+
+
+                    startLocationEditText.setText(trip.
+                            getString("start_location"));
+                    endLocationName = trip.
+                            getString("end_location");
+                    destinationLocationEditText.setText(trip.
+                            getString("end_location"));
+                    descriptionEditText.setText(trip.
+                            getString("description"));
+                    String status = trip.
+                            getString("status")+"ed";
+                    status  = status.substring(0, 1).toUpperCase() + status.substring(1);
+                    statusEditText.setText(status);
+                    amountEditText.setText(trip.
+                            getString("amount"));
+                    JSONArray stopovers = trip.getJSONArray("locations");
+                    String stopoverNames = "";
+
+                    for (int i = 0; i < stopovers.length(); i++) {
+                        String name = stopovers.getJSONObject(i).getString("name");
+                        String createdAt = stopovers.getJSONObject(i).getString("created_at");
+                        ZonedDateTime dateTime = Instant.parse(createdAt).atZone(ZoneId.of("Africa/Nairobi"));
+                        String formatted = dateTime.format(DateTimeFormatter.ofPattern("dd-MMM-yyyy HH:mm"));
+
+                        int currentPosition = i+1;
+                        stopoverNames +=currentPosition+". "+name+" "+formatted+"\n";
+                        //obj.imageDrw = drw_arr.getDrawable(obj.image);
+//                        items.add(obj);
+
+                    }
+
+                    if(stopovers.length()==0){
+                        stopoverNames = "No stopovers yet";
+                    }
+
+                    stopoverEditText.setText(stopoverNames);
+
+
+                    if (trip.has("end_lat") && trip.isNull("end_lat")) {
+//                        locationDetectTextview.setVisibility(View.VISIBLE);
+//                        endTripButton.setVisibility(View.VISIBLE);
+//                        addStopoverButton.setVisibility(View.VISIBLE);
+
+                    }
+
+
+
+                    String createdAt = trip.getString("created_at");
+                    ZonedDateTime dateTime = Instant.parse(createdAt).atZone(ZoneId.of("Africa/Nairobi"));
+                    String formattedDate = dateTime.format(DateTimeFormatter.ofPattern("dd-MMM-yyyy"));
+                    String formattedTime = dateTime.format(DateTimeFormatter.ofPattern("HH:mm"));
+//                    dateTextView.setText(formattedDate);
+//                    timeTextView.setText(formattedTime);
+
+
+                }
+                else if(result.contains("errors")){
+                    String message = jsonObject.getString("message");
+//                    Toasts.toastIconError(IndividualDealActivity.this,message);
+                    Toast.makeText(getBaseContext(), message, Toast.LENGTH_SHORT).show();
+                }
+                else{
+//                    Toasts.toastIconError(IndividualDealActivity.this,"Error Loading Account. Please Try Again");
+                    Toast.makeText(getBaseContext(), "Error Loading Trip. Please Try Again", Toast.LENGTH_SHORT).show();
+//                    FirebaseCrashlytics.getInstance().recordException(new Exception("Add Account Error: "+result));
+
+                }
+
+            }
+            else if (result != null && result.contains("success") &&
+                    endpoint.equals("endtrip/"+tripId))
+            {
+                JSONObject jsonObject = new JSONObject(result);
+                if (jsonObject.has("status") &&
+                        jsonObject.get("status") instanceof String &&
+                        jsonObject.get("status").equals("success")
+                ) {
+                    String message = jsonObject.getString("message");
+
+                    mPrefs = getSharedPreferences("label", 0);
+                    SharedPreferences.Editor mEditor = mPrefs.edit();
+//                    mTripId = mPrefs.getString("tripId", null);
+
+//                    dbHelper.insertLocation(mLastLocation.getLatitude()+"",
+//                            mLastLocation.getLongitude()+"",
+//                            mLastLocation.getAccuracy()+"",
+//                            "0","unsynced",
+//                            Integer.parseInt(tripId),"end",endLocationName);
+
+                    mEditor.putString("tripId", null).commit();
+
+//                    Toasts.toastIconSuccess(EditMeetingActivity.this,message);
+                    Toast.makeText(ViewTripActivity.this, message,
+                            Toast.LENGTH_SHORT).show();
+                    Intent intent = new Intent(ViewTripActivity.this,
+                            ViewTripActivity.class);
+                    intent.putExtra("tripId", tripId);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                    startActivity(intent);
+
+                }
+                else if(result.contains("errors")){
+                    String message = jsonObject.getString("message");
+//                    Toasts.toastIconError(EditMeetingActivity.this,message);
+                    Toast.makeText(getBaseContext(), message, Toast.LENGTH_SHORT).show();
+                }
+                else{
+
+//                    Toasts.toastIconError(EditMeetingActivity.this,
+//                            "Error Editing Meeting. Please Try Again");
+                    Toast.makeText(ViewTripActivity.this,
+                            "Error Ending Trip. Please Try Again",Toast.LENGTH_SHORT).show();
+                    FirebaseCrashlytics.getInstance().recordException(new Exception("Error Ending Trip Error: "+result));
+
+                }
+
+            }
+            else{
+//                Toasts.toastIconError(IndividualDealActivity.this,"Loading Account Failed. Please Try Again");
+                Toast.makeText(getBaseContext(), "Something went wrong. Please Try Again", Toast.LENGTH_SHORT).show();
+                FirebaseCrashlytics.getInstance().recordException(new Exception("Add Account Error: "+result));
+
+            }
+
+//            Log.d("API Success", "Data: " + jsonObject.toString());
+
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
+    @Override
+    public void onComplete() {
+
+    }
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case android.R.id.home:
+                onBackPressed();
+                Intent intent = new Intent(ViewTripActivity.this, TripsActivity.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                //intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
+                return true;
+        }
+
+        return super.onOptionsItemSelected(item);
+    }
+
+    //START OF LATEST LOCATION CODE
+
+    private void requestLocationUpdates() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
+            mFusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper());
+        } else {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_LOCATION_PERMISSION);
+        }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
+            mFusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper());
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        mFusedLocationClient.removeLocationUpdates(locationCallback);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_LOCATION_PERMISSION) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                requestLocationUpdates();
+            } else {
+//                Toasts.toastIconError(ClockinActivity.this,"Location Permission Denied");
+                Toast.makeText(this, "Location permission denied", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    private void detectLocation(){
+        locationCallback = new LocationCallback() {
+            @Override
+            public void onLocationResult(LocationResult locationResult) {
+                if (locationResult == null) {
+                    return;
+                }
+                for (Location location : locationResult.getLocations()) {
+
+                    mLastLocation = location;
+
+
+                    if(mLastLocation!=null){
+                        //Double distance = MyUtils.calculateDistance(Double.parseDouble(lat1),Double.parseDouble(lon1),location.getLatitude(),location.getLongitude());
+                        //toastIconError(distance+"");
+                        //+" - "+mLastLocation.getAltitude()
+                        //toastIconError(mLastLocation.getLatitude()+" - "+mLastLocation.getLongitude());
+
+                    }else if(mLastLocation!=null){
+                        //+" - "+mLastLocation.getAltitude()
+                        //toastIconError(mLastLocation.getLatitude()+" - "+mLastLocation.getLongitude());
+
+                    }
+
+                }
+            }
+        };
+    }
+
+    //END OF LATEST LOCATION CODE
+
+    //PICKED FROM OLD CODE BUT MIGHT BE VALID
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (checkPermissions()) {
+            mFusedLocationClient = LocationServices.getFusedLocationProviderClient(getApplicationContext());
+            detectLocation();
+        }
+    }
+    //PICKED FROM OLD CODE BUT MIGHT BE VALID
+    // method to check for permissions
+    private boolean checkPermissions() {
+        return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+
+        // If we want background location
+        // on Android 10.0 and higher,
+        // use:
+        // ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
+    }
+
+
+}
