@@ -23,8 +23,13 @@ public class Constants {
 //    public static final String STORAGE_URL = "http://rtmstest.javytech.com/storage/";
     public static final long EXPIRY_MILLIS = 6600000;
 
-    public static final String BASE_URL = "https://tracker.scgafrica.com/api/";
-    public static final String STORAGE_URL = "https://tracker.scgafrica.com/storage/";
+//    public static final String BASE_URL = "https://tracker.scgafrica.com/api/";
+//    public static final String STORAGE_URL = "https://tracker.scgafrica.com/storage/";
+
+    public static final String BASE_URL = "https://logisticstrackerdemo.av.ke/api/";
+    public static final String STORAGE_URL = "https://logisticstrackerdemo.av.ke/storage/";
+
+
 
 //    public static final String BASE_URL = "https://rtmssplit.av.ke/";
 //    public static final String STORAGE_URL = "https://rtmssplit.av.ke/storage/";
